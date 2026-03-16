@@ -1211,26 +1211,26 @@ async def run_twitter_simulation(
     if action_logger:
         action_logger.log_round_end(0, initial_action_count)
     
-    # 主模拟循环
+    # Main simulation loop
     time_config = config.get("time_config", {})
     total_hours = time_config.get("total_simulation_hours", 72)
     minutes_per_round = time_config.get("minutes_per_round", 30)
     total_rounds = (total_hours * 60) // minutes_per_round
     
-    # 如果指定了最大轮数，则截断
+    # Truncate if max rounds is specified
     if max_rounds is not None and max_rounds > 0:
         original_rounds = total_rounds
         total_rounds = min(total_rounds, max_rounds)
         if total_rounds < original_rounds:
-            log_info(f"轮数已截断: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
+            log_info(f"Rounds truncated: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
     
     start_time = datetime.now()
     
     for round_num in range(total_rounds):
-        # 检查是否收到退出信号
+        # Check if a shutdown signal was received
         if _shutdown_event and _shutdown_event.is_set():
             if main_logger:
-                main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
+                main_logger.info(f"Received shutdown signal, stopping simulation at round {round_num + 1}")
             break
         
         simulated_minutes = round_num * minutes_per_round
@@ -1241,12 +1241,12 @@ async def run_twitter_simulation(
             result.env, config, simulated_hour, round_num
         )
         
-        # 无论是否有活跃agent，都记录round开始
+        # Always log round start regardless of whether there are active agents
         if action_logger:
             action_logger.log_round_start(round_num + 1, simulated_hour)
         
         if not active_agents:
-            # 没有活跃agent时也记录round结束（actions_count=0）
+            # Also log round end when there are no active agents (actions_count=0)
             if action_logger:
                 action_logger.log_round_end(round_num + 1, 0)
             continue
@@ -1254,7 +1254,7 @@ async def run_twitter_simulation(
         actions = {agent: LLMAction() for _, agent in active_agents}
         await result.env.step(actions)
         
-        # 从数据库获取实际执行的动作并记录
+        # Fetch actually executed actions from the database and log them
         actual_actions, last_rowid = fetch_new_actions_from_db(
             db_path, last_rowid, agent_names
         )
@@ -1279,14 +1279,14 @@ async def run_twitter_simulation(
             progress = (round_num + 1) / total_rounds * 100
             log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - Round {round_num + 1}/{total_rounds} ({progress:.1f}%)")
     
-    # 注意：不关闭环境，保留给Interview使用
+    # Note: do not close the environment; keep it available for interviews
     
     if action_logger:
         action_logger.log_simulation_end(total_rounds, total_actions)
     
     result.total_actions = total_actions
     elapsed = (datetime.now() - start_time).total_seconds()
-    log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
+    log_info(f"Simulation loop completed! Duration: {elapsed:.1f}s, total actions: {total_actions}")
     
     return result
 
@@ -1298,17 +1298,17 @@ async def run_reddit_simulation(
     main_logger: Optional[SimulationLogManager] = None,
     max_rounds: Optional[int] = None
 ) -> PlatformSimulation:
-    """运行Reddit模拟
-    
+    """Run the Reddit simulation.
+
     Args:
-        config: 模拟配置
-        simulation_dir: 模拟目录
-        action_logger: 动作日志记录器
-        main_logger: 主日志管理器
-        max_rounds: 最大模拟轮数（可选，用于截断过长的模拟）
-        
+        config: Simulation configuration
+        simulation_dir: Simulation directory
+        action_logger: Action logger
+        main_logger: Main log manager
+        max_rounds: Maximum number of simulation rounds (optional, used to truncate overly long simulations)
+
     Returns:
-        PlatformSimulation: 包含env和agent_graph的结果对象
+        PlatformSimulation: Result object containing env and agent_graph
     """
     result = PlatformSimulation()
     
@@ -1317,14 +1317,14 @@ async def run_reddit_simulation(
             main_logger.info(f"[Reddit] {msg}")
         print(f"[Reddit] {msg}")
     
-    log_info("初始化...")
-    
-    # Reddit 使用加速 LLM 配置（如果有的话，否则回退到通用配置）
+    log_info("Initializing...")
+
+    # Reddit uses the boost LLM configuration (if available, otherwise falls back to standard)
     model = create_model(config, use_boost=True)
     
     profile_path = os.path.join(simulation_dir, "reddit_profiles.json")
     if not os.path.exists(profile_path):
-        log_info(f"错误: Profile文件不存在: {profile_path}")
+        log_info(f"Error: Profile file does not exist: {profile_path}")
         return result
     
     result.agent_graph = await generate_reddit_agent_graph(
@@ -1333,13 +1333,13 @@ async def run_reddit_simulation(
         available_actions=REDDIT_ACTIONS,
     )
     
-    # 从配置文件获取 Agent 真实名称映射（使用 entity_name 而非默认的 Agent_X）
+    # Get agent real name mapping from config (using entity_name instead of default Agent_X)
     agent_names = get_agent_names_from_config(config)
-    # 如果配置中没有某个 agent，则使用 OASIS 的默认名称
+    # For agents not in config, use OASIS default names
     for agent_id, agent in result.agent_graph.get_agents():
         if agent_id not in agent_names:
             agent_names[agent_id] = getattr(agent, 'name', f'Agent_{agent_id}')
-    
+
     db_path = os.path.join(simulation_dir, "reddit_simulation.db")
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -1410,26 +1410,26 @@ async def run_reddit_simulation(
     if action_logger:
         action_logger.log_round_end(0, initial_action_count)
     
-    # 主模拟循环
+    # Main simulation loop
     time_config = config.get("time_config", {})
     total_hours = time_config.get("total_simulation_hours", 72)
     minutes_per_round = time_config.get("minutes_per_round", 30)
     total_rounds = (total_hours * 60) // minutes_per_round
     
-    # 如果指定了最大轮数，则截断
+    # Truncate if max rounds is specified
     if max_rounds is not None and max_rounds > 0:
         original_rounds = total_rounds
         total_rounds = min(total_rounds, max_rounds)
         if total_rounds < original_rounds:
-            log_info(f"轮数已截断: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
+            log_info(f"Rounds truncated: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
     
     start_time = datetime.now()
     
     for round_num in range(total_rounds):
-        # 检查是否收到退出信号
+        # Check if a shutdown signal was received
         if _shutdown_event and _shutdown_event.is_set():
             if main_logger:
-                main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
+                main_logger.info(f"Received shutdown signal, stopping simulation at round {round_num + 1}")
             break
         
         simulated_minutes = round_num * minutes_per_round
@@ -1440,12 +1440,12 @@ async def run_reddit_simulation(
             result.env, config, simulated_hour, round_num
         )
         
-        # 无论是否有活跃agent，都记录round开始
+        # Always log round start regardless of whether there are active agents
         if action_logger:
             action_logger.log_round_start(round_num + 1, simulated_hour)
         
         if not active_agents:
-            # 没有活跃agent时也记录round结束（actions_count=0）
+            # Also log round end when there are no active agents (actions_count=0)
             if action_logger:
                 action_logger.log_round_end(round_num + 1, 0)
             continue
@@ -1453,7 +1453,7 @@ async def run_reddit_simulation(
         actions = {agent: LLMAction() for _, agent in active_agents}
         await result.env.step(actions)
         
-        # 从数据库获取实际执行的动作并记录
+        # Fetch actually executed actions from the database and log them
         actual_actions, last_rowid = fetch_new_actions_from_db(
             db_path, last_rowid, agent_names
         )
@@ -1478,76 +1478,76 @@ async def run_reddit_simulation(
             progress = (round_num + 1) / total_rounds * 100
             log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - Round {round_num + 1}/{total_rounds} ({progress:.1f}%)")
     
-    # 注意：不关闭环境，保留给Interview使用
+    # Note: do not close the environment; keep it available for interviews
     
     if action_logger:
         action_logger.log_simulation_end(total_rounds, total_actions)
     
     result.total_actions = total_actions
     elapsed = (datetime.now() - start_time).total_seconds()
-    log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
+    log_info(f"Simulation loop completed! Duration: {elapsed:.1f}s, total actions: {total_actions}")
     
     return result
 
 
 async def main():
-    parser = argparse.ArgumentParser(description='OASIS双平台并行模拟')
+    parser = argparse.ArgumentParser(description='OASIS Dual-Platform Parallel Simulation')
     parser.add_argument(
         '--config', 
         type=str, 
         required=True,
-        help='配置文件路径 (simulation_config.json)'
+        help='Path to configuration file (simulation_config.json)'
     )
     parser.add_argument(
         '--twitter-only',
         action='store_true',
-        help='只运行Twitter模拟'
+        help='Run Twitter simulation only'
     )
     parser.add_argument(
         '--reddit-only',
         action='store_true',
-        help='只运行Reddit模拟'
+        help='Run Reddit simulation only'
     )
     parser.add_argument(
         '--max-rounds',
         type=int,
         default=None,
-        help='最大模拟轮数（可选，用于截断过长的模拟）'
+        help='Maximum simulation rounds (optional, used to truncate overly long simulations)'
     )
     parser.add_argument(
         '--no-wait',
         action='store_true',
         default=False,
-        help='模拟完成后立即关闭环境，不进入等待命令模式'
+        help='Close environment immediately after simulation, do not enter command-waiting mode'
     )
     
     args = parser.parse_args()
     
-    # 在 main 函数开始时创建 shutdown 事件，确保整个程序都能响应退出信号
+    # Create shutdown event at the start of main to ensure the entire program can respond to shutdown signals
     global _shutdown_event
     _shutdown_event = asyncio.Event()
     
     if not os.path.exists(args.config):
-        print(f"错误: 配置文件不存在: {args.config}")
+        print(f"Error: configuration file does not exist: {args.config}")
         sys.exit(1)
     
     config = load_config(args.config)
     simulation_dir = os.path.dirname(args.config) or "."
     wait_for_commands = not args.no_wait
     
-    # 初始化日志配置（禁用 OASIS 日志，清理旧文件）
+    # Initialize logging configuration (disable OASIS logs, clean up old files)
     init_logging_for_simulation(simulation_dir)
     
-    # 创建日志管理器
+    # Create log manager
     log_manager = SimulationLogManager(simulation_dir)
     twitter_logger = log_manager.get_twitter_logger()
     reddit_logger = log_manager.get_reddit_logger()
     
     log_manager.info("=" * 60)
-    log_manager.info("OASIS 双平台并行模拟")
-    log_manager.info(f"配置文件: {args.config}")
-    log_manager.info(f"模拟ID: {config.get('simulation_id', 'unknown')}")
-    log_manager.info(f"等待命令模式: {'启用' if wait_for_commands else '禁用'}")
+    log_manager.info("OASIS Dual-Platform Parallel Simulation")
+    log_manager.info(f"Config file: {args.config}")
+    log_manager.info(f"Simulation ID: {config.get('simulation_id', 'unknown')}")
+    log_manager.info(f"Command-waiting mode: {'enabled' if wait_for_commands else 'disabled'}")
     log_manager.info("=" * 60)
     
     time_config = config.get("time_config", {})

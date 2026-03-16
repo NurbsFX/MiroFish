@@ -1667,11 +1667,11 @@ class ReportAgent:
                 section.content = section_content
                 generated_sections.append(f"## {section.title}\n\n{section_content}")
 
-                # 保存章节
+                # Save section
                 ReportManager.save_section(report_id, section_num, section)
                 completed_section_titles.append(section.title)
 
-                # 记录章节完成日志
+                # Log section completion
                 full_section_content = f"## {section.title}\n\n{section_content}"
 
                 if self.report_logger:
@@ -1681,54 +1681,54 @@ class ReportAgent:
                         full_content=full_section_content.strip()
                     )
 
-                logger.info(f"章节已保存: {report_id}/section_{section_num:02d}.md")
+                logger.info(f"Section saved: {report_id}/section_{section_num:02d}.md")
                 
                 # Update progress
                 ReportManager.update_progress(
                     report_id, "generating", 
                     base_progress + int(70 / total_sections),
-                    f"章节 {section.title} 已完成",
+                    f"Section {section.title} completed",
                     current_section=None,
                     completed_sections=completed_section_titles
                 )
             
-            # 阶段3: 组装完整报告
+            # Phase 3: Assemble complete report
             if progress_callback:
-                progress_callback("generating", 95, "正在组装完整报告...")
+                progress_callback("generating", 95, "Assembling complete report...")
             
             ReportManager.update_progress(
-                report_id, "generating", 95, "正在组装完整报告...",
+                report_id, "generating", 95, "Assembling complete report...",
                 completed_sections=completed_section_titles
             )
             
-            # 使用ReportManager组装完整报告
+            # Use ReportManager to assemble complete report
             report.markdown_content = ReportManager.assemble_full_report(report_id, outline)
             report.status = ReportStatus.COMPLETED
             report.completed_at = datetime.now().isoformat()
             
-            # 计算总耗时
+            # Calculate total time
             total_time_seconds = (datetime.now() - start_time).total_seconds()
             
-            # 记录报告完成日志
+            # Log report completion
             if self.report_logger:
                 self.report_logger.log_report_complete(
                     total_sections=total_sections,
                     total_time_seconds=total_time_seconds
                 )
             
-            # 保存最终报告
+            # Save final report
             ReportManager.save_report(report)
             ReportManager.update_progress(
-                report_id, "completed", 100, "报告生成完成",
+                report_id, "completed", 100, "Report generation completed",
                 completed_sections=completed_section_titles
             )
             
             if progress_callback:
-                progress_callback("completed", 100, "报告生成完成")
+                progress_callback("completed", 100, "Report generation completed")
             
-            logger.info(f"报告生成完成: {report_id}")
+            logger.info(f"Report generation completed: {report_id}")
             
-            # 关闭控制台日志记录器
+            # Close console logger
             if self.console_logger:
                 self.console_logger.close()
                 self.console_logger = None
@@ -1736,25 +1736,25 @@ class ReportAgent:
             return report
             
         except Exception as e:
-            logger.error(f"报告生成失败: {str(e)}")
+            logger.error(f"Report generation failed: {str(e)}")
             report.status = ReportStatus.FAILED
             report.error = str(e)
             
-            # 记录错误日志
+            # Log error
             if self.report_logger:
                 self.report_logger.log_error(str(e), "failed")
             
-            # 保存失败状态
+            # Save failed state
             try:
                 ReportManager.save_report(report)
                 ReportManager.update_progress(
-                    report_id, "failed", -1, f"报告生成失败: {str(e)}",
+                    report_id, "failed", -1, f"Report generation failed: {str(e)}",
                     completed_sections=completed_section_titles
                 )
             except Exception:
-                pass  # 忽略保存失败的错误
+                pass  # Ignore errors from saving failure
             
-            # 关闭控制台日志记录器
+            # Close console logger
             if self.console_logger:
                 self.console_logger.close()
                 self.console_logger = None
@@ -1767,59 +1767,59 @@ class ReportAgent:
         chat_history: List[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """
-        与Report Agent对话
-        
-        在对话中Agent可以自主调用检索工具来回答问题
-        
+        Chat with Report Agent
+
+        During chat, Agent can autonomously invoke retrieval tools to answer questions
+
         Args:
-            message: 用户消息
-            chat_history: 对话历史
-            
+            message: User message
+            chat_history: Chat history
+
         Returns:
             {
-                "response": "Agent回复",
-                "tool_calls": [调用的工具列表],
-                "sources": [信息来源]
+                "response": "Agent reply",
+                "tool_calls": [List of invoked tools],
+                "sources": [Information sources]
             }
         """
-        logger.info(f"Report Agent对话: {message[:50]}...")
-        
+        logger.info(f"Report Agent chat: {message[:50]}...")
+
         chat_history = chat_history or []
-        
-        # 获取已生成的报告内容
+
+        # Get already generated report content
         report_content = ""
         try:
             report = ReportManager.get_report_by_simulation(self.simulation_id)
             if report and report.markdown_content:
-                # 限制报告长度，避免上下文过长
+                # Limit report length to avoid overly long context
                 report_content = report.markdown_content[:15000]
                 if len(report.markdown_content) > 15000:
-                    report_content += "\n\n... [报告内容已截断] ..."
+                    report_content += "\n\n... [Report content truncated] ..."
         except Exception as e:
-            logger.warning(f"获取报告内容失败: {e}")
-        
+            logger.warning(f"Failed to get report content: {e}")
+
         system_prompt = CHAT_SYSTEM_PROMPT_TEMPLATE.format(
             simulation_requirement=self.simulation_requirement,
-            report_content=report_content if report_content else "（暂无报告）",
+            report_content=report_content if report_content else "(No report available yet)",
             tools_description=self._get_tools_description(),
         )
 
-        # 构建消息
+        # Build messages
         messages = [{"role": "system", "content": system_prompt}]
-        
-        # 添加历史对话
-        for h in chat_history[-10:]:  # 限制历史长度
+
+        # Add chat history
+        for h in chat_history[-10:]:  # Limit history length
             messages.append(h)
-        
-        # 添加用户消息
+
+        # Add user message
         messages.append({
             "role": "user", 
             "content": message
         })
         
-        # ReACT循环（简化版）
+        # ReACT loop (simplified)
         tool_calls_made = []
-        max_iterations = 2  # 减少迭代轮数
+        max_iterations = 2  # Reduced iteration rounds
         
         for iteration in range(max_iterations):
             response = self.llm.chat(
@@ -1827,11 +1827,11 @@ class ReportAgent:
                 temperature=0.5
             )
             
-            # 解析工具调用
+            # Parse tool calls
             tool_calls = self._parse_tool_calls(response)
-            
+
             if not tool_calls:
-                # 没有工具调用，直接返回响应
+                # No tool calls, return response directly
                 clean_response = re.sub(r'<tool_call>.*?</tool_call>', '', response, flags=re.DOTALL)
                 clean_response = re.sub(r'\[TOOL_CALL\].*?\)', '', clean_response)
                 
@@ -2122,7 +2122,7 @@ class ReportManager:
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(md_content)
 
-        logger.info(f"章节已保存: {report_id}/{file_suffix}")
+        logger.info(f"Section saved: {report_id}/{file_suffix}")
         return file_path
     
     @classmethod

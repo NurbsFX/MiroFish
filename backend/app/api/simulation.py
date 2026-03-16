@@ -2124,7 +2124,7 @@ def get_simulation_comments(simulation_id: str):
         })
         
     except Exception as e:
-        logger.error(f"获取评论失败: {str(e)}")
+        logger.error(f"Failed to get comments: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),
@@ -2132,31 +2132,31 @@ def get_simulation_comments(simulation_id: str):
         }), 500
 
 
-# ============== Interview 采访接口 ==============
+# ============== Interview Endpoints ==============
 
 @simulation_bp.route('/interview', methods=['POST'])
 def interview_agent():
     """
-    采访单个Agent
+    Interview a single Agent
 
-    注意：此功能需要模拟环境处于运行状态（完成模拟循环后进入等待命令模式）
+    Note: This feature requires the simulation environment to be running (in command-waiting mode after completing simulation cycles)
 
-    请求（JSON）：
+    Request (JSON):
         {
-            "simulation_id": "sim_xxxx",       // 必填，模拟ID
-            "agent_id": 0,                     // 必填，Agent ID
-            "prompt": "你对这件事有什么看法？",  // 必填，采访问题
-            "platform": "twitter",             // 可选，指定平台（twitter/reddit）
-                                               // 不指定时：双平台模拟同时采访两个平台
-            "timeout": 60                      // 可选，超时时间（秒），默认60
+            "simulation_id": "sim_xxxx",                     // Required, simulation ID
+            "agent_id": 0,                                   // Required, Agent ID
+            "prompt": "What do you think about this?",       // Required, interview question
+            "platform": "twitter",                           // Optional, specify platform (twitter/reddit)
+                                                             // If not specified: dual-platform simulation interviews both platforms simultaneously
+            "timeout": 60                                    // Optional, timeout in seconds, default 60
         }
 
-    返回（不指定platform，双平台模式）：
+    Returns (no platform specified, dual-platform mode):
         {
             "success": true,
             "data": {
                 "agent_id": 0,
-                "prompt": "你对这件事有什么看法？",
+                "prompt": "What do you think about this?",
                 "result": {
                     "agent_id": 0,
                     "prompt": "...",
@@ -2169,15 +2169,15 @@ def interview_agent():
             }
         }
 
-    返回（指定platform）：
+    Returns (platform specified):
         {
             "success": true,
             "data": {
                 "agent_id": 0,
-                "prompt": "你对这件事有什么看法？",
+                "prompt": "What do you think about this?",
                 "result": {
                     "agent_id": 0,
-                    "response": "我认为...",
+                    "response": "I think...",
                     "platform": "twitter",
                     "timestamp": "2025-12-08T10:00:00"
                 },
@@ -2191,7 +2191,7 @@ def interview_agent():
         simulation_id = data.get('simulation_id')
         agent_id = data.get('agent_id')
         prompt = data.get('prompt')
-        platform = data.get('platform')  # 可选：twitter/reddit/None
+        platform = data.get('platform')  # Optional: twitter/reddit/None
         timeout = data.get('timeout', 60)
         
         if not simulation_id:
@@ -2203,30 +2203,30 @@ def interview_agent():
         if agent_id is None:
             return jsonify({
                 "success": False,
-                "error": "请提供 agent_id"
+                "error": "Please provide agent_id"
             }), 400
         
         if not prompt:
             return jsonify({
                 "success": False,
-                "error": "请提供 prompt（采访问题）"
+                "error": "Please provide prompt (interview question)"
             }), 400
         
-        # 验证platform参数
+        # Validate platform parameter
         if platform and platform not in ("twitter", "reddit"):
             return jsonify({
                 "success": False,
-                "error": "platform 参数只能是 'twitter' 或 'reddit'"
+                "error": "platform parameter can only be 'twitter' or 'reddit'"
             }), 400
         
-        # 检查环境状态
+        # Check environment status
         if not SimulationRunner.check_env_alive(simulation_id):
             return jsonify({
                 "success": False,
-                "error": "模拟环境未运行或已关闭。请确保模拟已完成并进入等待命令模式。"
+                "error": "Simulation environment is not running or has been closed. Please ensure the simulation has completed and entered command-waiting mode."
             }), 400
         
-        # 优化prompt，添加前缀避免Agent调用工具
+        # Optimize prompt by adding prefix to prevent Agent from calling tools
         optimized_prompt = optimize_interview_prompt(prompt)
         
         result = SimulationRunner.interview_agent(
@@ -2251,11 +2251,11 @@ def interview_agent():
     except TimeoutError as e:
         return jsonify({
             "success": False,
-            "error": f"等待Interview响应超时: {str(e)}"
+            "error": f"Timed out waiting for interview response: {str(e)}"
         }), 504
         
     except Exception as e:
-        logger.error(f"Interview失败: {str(e)}")
+        logger.error(f"Interview failed: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),
@@ -2266,30 +2266,30 @@ def interview_agent():
 @simulation_bp.route('/interview/batch', methods=['POST'])
 def interview_agents_batch():
     """
-    批量采访多个Agent
+    Batch interview multiple Agents
 
-    注意：此功能需要模拟环境处于运行状态
+    Note: This feature requires the simulation environment to be running
 
-    请求（JSON）：
+    Request (JSON):
         {
-            "simulation_id": "sim_xxxx",       // 必填，模拟ID
-            "interviews": [                    // 必填，采访列表
+            "simulation_id": "sim_xxxx",               // Required, simulation ID
+            "interviews": [                            // Required, interview list
                 {
                     "agent_id": 0,
-                    "prompt": "你对A有什么看法？",
-                    "platform": "twitter"      // 可选，指定该Agent的采访平台
+                    "prompt": "What do you think about A?",
+                    "platform": "twitter"              // Optional, specify this Agent's interview platform
                 },
                 {
                     "agent_id": 1,
-                    "prompt": "你对B有什么看法？"  // 不指定platform则使用默认值
+                    "prompt": "What do you think about B?"  // If platform not specified, uses default
                 }
             ],
-            "platform": "reddit",              // 可选，默认平台（被每项的platform覆盖）
-                                               // 不指定时：双平台模拟每个Agent同时采访两个平台
-            "timeout": 120                     // 可选，超时时间（秒），默认120
+            "platform": "reddit",                      // Optional, default platform (overridden by each item's platform)
+                                                       // If not specified: dual-platform simulation interviews each Agent on both platforms
+            "timeout": 120                             // Optional, timeout in seconds, default 120
         }
 
-    返回：
+    Returns:
         {
             "success": true,
             "data": {
@@ -2312,7 +2312,7 @@ def interview_agents_batch():
 
         simulation_id = data.get('simulation_id')
         interviews = data.get('interviews')
-        platform = data.get('platform')  # 可选：twitter/reddit/None
+        platform = data.get('platform')  # Optional: twitter/reddit/None
         timeout = data.get('timeout', 120)
 
         if not simulation_id:
@@ -2324,44 +2324,44 @@ def interview_agents_batch():
         if not interviews or not isinstance(interviews, list):
             return jsonify({
                 "success": False,
-                "error": "请提供 interviews（采访列表）"
+                "error": "Please provide interviews (interview list)"
             }), 400
 
-        # 验证platform参数
+        # Validate platform parameter
         if platform and platform not in ("twitter", "reddit"):
             return jsonify({
                 "success": False,
-                "error": "platform 参数只能是 'twitter' 或 'reddit'"
+                "error": "platform parameter can only be 'twitter' or 'reddit'"
             }), 400
 
-        # 验证每个采访项
+        # Validate each interview item
         for i, interview in enumerate(interviews):
             if 'agent_id' not in interview:
                 return jsonify({
                     "success": False,
-                    "error": f"采访列表第{i+1}项缺少 agent_id"
+                    "error": f"Interview list item {i+1} is missing agent_id"
                 }), 400
             if 'prompt' not in interview:
                 return jsonify({
                     "success": False,
-                    "error": f"采访列表第{i+1}项缺少 prompt"
+                    "error": f"Interview list item {i+1} is missing prompt"
                 }), 400
-            # 验证每项的platform（如果有）
+            # Validate each item's platform (if present)
             item_platform = interview.get('platform')
             if item_platform and item_platform not in ("twitter", "reddit"):
                 return jsonify({
                     "success": False,
-                    "error": f"采访列表第{i+1}项的platform只能是 'twitter' 或 'reddit'"
+                    "error": f"Interview list item {i+1}'s platform can only be 'twitter' or 'reddit'"
                 }), 400
 
-        # 检查环境状态
+        # Check environment status
         if not SimulationRunner.check_env_alive(simulation_id):
             return jsonify({
                 "success": False,
-                "error": "模拟环境未运行或已关闭。请确保模拟已完成并进入等待命令模式。"
+                "error": "Simulation environment is not running or has been closed. Please ensure the simulation has completed and entered command-waiting mode."
             }), 400
 
-        # 优化每个采访项的prompt，添加前缀避免Agent调用工具
+        # Optimize each interview item's prompt by adding prefix to prevent Agent from calling tools
         optimized_interviews = []
         for interview in interviews:
             optimized_interview = interview.copy()
@@ -2439,7 +2439,7 @@ def interview_all_agents():
 
         simulation_id = data.get('simulation_id')
         prompt = data.get('prompt')
-        platform = data.get('platform')  # 可选：twitter/reddit/None
+        platform = data.get('platform')  # Optional: twitter/reddit/None
         timeout = data.get('timeout', 180)
 
         if not simulation_id:
@@ -2451,24 +2451,24 @@ def interview_all_agents():
         if not prompt:
             return jsonify({
                 "success": False,
-                "error": "请提供 prompt（采访问题）"
+                "error": "Please provide prompt (interview question)"
             }), 400
 
-        # 验证platform参数
+        # Validate platform parameter
         if platform and platform not in ("twitter", "reddit"):
             return jsonify({
                 "success": False,
-                "error": "platform 参数只能是 'twitter' 或 'reddit'"
+                "error": "platform parameter can only be 'twitter' or 'reddit'"
             }), 400
 
-        # 检查环境状态
+        # Check environment status
         if not SimulationRunner.check_env_alive(simulation_id):
             return jsonify({
                 "success": False,
-                "error": "模拟环境未运行或已关闭。请确保模拟已完成并进入等待命令模式。"
+                "error": "Simulation environment is not running or has been closed. Please ensure the simulation has completed and entered command-waiting mode."
             }), 400
 
-        # 优化prompt，添加前缀避免Agent调用工具
+        # Optimize prompt by adding prefix to prevent Agent from calling tools
         optimized_prompt = optimize_interview_prompt(prompt)
 
         result = SimulationRunner.interview_all_agents(
