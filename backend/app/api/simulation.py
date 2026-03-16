@@ -2579,16 +2579,16 @@ def get_interview_history():
 @simulation_bp.route('/env-status', methods=['POST'])
 def get_env_status():
     """
-    获取模拟环境状态
+    Get simulation environment status
 
-    检查模拟环境是否存活（可以接收Interview命令）
+    Check whether the simulation environment is alive (can receive interview commands)
 
-    请求（JSON）：
+    Request (JSON):
         {
-            "simulation_id": "sim_xxxx"  // 必填，模拟ID
+            "simulation_id": "sim_xxxx"  // Required, simulation ID
         }
 
-    返回：
+    Returns:
         {
             "success": true,
             "data": {
@@ -2596,7 +2596,7 @@ def get_env_status():
                 "env_alive": true,
                 "twitter_available": true,
                 "reddit_available": true,
-                "message": "环境正在运行，可以接收Interview命令"
+                "message": "Environment is running and can receive interview commands"
             }
         }
     """
@@ -2613,13 +2613,13 @@ def get_env_status():
 
         env_alive = SimulationRunner.check_env_alive(simulation_id)
         
-        # 获取更详细的状态信息
+        # Get more detailed status info
         env_status = SimulationRunner.get_env_status_detail(simulation_id)
 
         if env_alive:
-            message = "环境正在运行，可以接收Interview命令"
+            message = "Environment is running and can receive interview commands"
         else:
-            message = "环境未运行或已关闭"
+            message = "Environment is not running or has been closed"
 
         return jsonify({
             "success": True,
@@ -2633,7 +2633,7 @@ def get_env_status():
         })
 
     except Exception as e:
-        logger.error(f"获取环境状态失败: {str(e)}")
+        logger.error(f"Failed to get environment status: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),

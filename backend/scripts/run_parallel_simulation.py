@@ -1622,13 +1622,13 @@ async def main():
                     await asyncio.wait_for(_shutdown_event.wait(), timeout=0.5)
                     break  # Received shutdown signal
                 except asyncio.TimeoutError:
-                    pass  # 超时继续循环
+                    pass  # Timeout, continue loop
         except KeyboardInterrupt:
-            print("\n收到中断信号")
+            print("\nReceived interrupt signal")
         except asyncio.CancelledError:
-            print("\n任务被取消")
+            print("\nTask cancelled")
         except Exception as e:
-            print(f"\n命令处理出错: {e}")
+            print(f"\nError processing commands: {e}")
         
         log_manager.info("\n关闭环境...")
         ipc_handler.update_status("stopped")
